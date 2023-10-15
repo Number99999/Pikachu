@@ -1,7 +1,10 @@
 {
-  "name": "NewProject",
-  "uuid": "1a0bb18d-6e8e-4f46-8193-89554fabcf58",
+  "name": "Connect_Animal",
+  "uuid": "d8a1e1a8-4cbb-404b-a4dd-4df9aa5a310a",
   "creator": {
     "version": "3.7.4"
+  },
+  "dependencies": {
+    "ws": "^8.14.2"
   }
 }
