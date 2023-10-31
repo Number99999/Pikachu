@@ -9,5 +9,8 @@ var UserData = {
   refresh: 5,
   level: 1,
   playing: false,
+  ready: false,
+  firtlogin: true,
 };
+
 export default UserData;

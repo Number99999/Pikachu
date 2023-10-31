@@ -7,9 +7,15 @@ var config = {
     Notic: "Notication",
     SearchRoom: "SearchRoom",
     UserInfo: "UserInfo",
+    Ready: "Ready",
+    PlayGame: "PlayGame",
+    SignUp: "SignUp",
+    SignIn: "SignIn",
+    ReConnect: "ReConnect",
+    InfoMap: "InfoMap",
   },
   data: {
-    lastRoom: 1,
+    lastRoom: 2,
   },
 };
 

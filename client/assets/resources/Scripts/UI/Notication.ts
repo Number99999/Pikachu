@@ -16,7 +16,7 @@ const { ccclass, property } = _decorator;
 export class Notication extends Component {
   @property(Label)
   lblNotic: Label;
-  start() {}
+  start() { }
 
   show(str: string) {
     this.node.active = true;
@@ -28,18 +28,18 @@ export class Notication extends Component {
     nodeNotice.setPosition(
       new Vec3(
         (480 + nodeNotice.getComponent(UITransform).width / 2) *
-          (Math.random() < 0.5 ? 1 : -1),
+        (Math.random() < 0.5 ? 1 : -1),
         0
       )
     );
 
     tween(nodeNotice)
-      .to(0.2, { position: new Vec3(0, 0) })
+      .to(0.4, { position: new Vec3(0, 0) })
       .call(() => {
         let opa = nodeNotice.getComponent(UIOpacity);
         tween(opa).to(0.5, { opacity: 100 }).start();
         tween(nodeNotice)
-          .to(0.7, { position: new Vec3(0, 50) })
+          .to(1.1, { position: new Vec3(0, 50) })
           .call(() => {
             nodeNotice.destroy();
           })
@@ -48,5 +48,5 @@ export class Notication extends Component {
       .start();
   }
 
-  update(deltaTime: number) {}
+  update(deltaTime: number) { }
 }

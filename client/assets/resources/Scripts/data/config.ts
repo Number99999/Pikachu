@@ -9,6 +9,12 @@ const config = {
     Notic: "Notication",
     SearchRoom: "SearchRoom",
     UserInfo: "UserInfo",
+    Ready: "Ready",
+    PlayGame: "PlayGame",
+    SignUp: "SignUp",
+    SignIn: "SignIn",
+    ReConnect: "ReConnect",
+    InfoMap: "InfoMap",
   },
   notice: {
     noRefresh: "Don't have refresh turn",
@@ -17,6 +23,8 @@ const config = {
     doneHint: "Hint done",
     win: "You win!!!",
     lose: "Lose~~~",
-  }
+  },
 };
+
+const level = {};
 export default config;

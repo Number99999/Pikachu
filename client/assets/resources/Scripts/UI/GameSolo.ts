@@ -4,6 +4,7 @@ import {
   Component,
   find,
   Graphics,
+  Input,
   instantiate,
   Label,
   math,
@@ -12,6 +13,7 @@ import {
   ProgressBar,
   Sprite,
   sys,
+  UITransform,
   Vec2,
   Vec3,
 } from "cc";
@@ -21,8 +23,8 @@ import { Item } from "./Item";
 import { GameManager } from "../Manager/GameManager";
 import config from "../data/config";
 const { ccclass, property } = _decorator;
-@ccclass("GamePlay")
-export class GamePlay extends Component {
+@ccclass("GameSolo")
+export class GameSolo extends Component {
   @property(Prefab)
   ItemPrefab: Prefab;
 
@@ -33,19 +35,13 @@ export class GamePlay extends Component {
   container: Node;
 
   @property(Node)
-  nodePause: Node;
+  miniMap: Node;
 
   @property(Label)
   lblCountLive: Label;
 
   @property(Label)
   lblCountHint: Label;
-
-  @property(Label)
-  lblCountRefresh: Label;
-
-  @property(Label)
-  lblLevel: Label;
 
   @property(Label)
   lblScore: Label;
@@ -62,18 +58,24 @@ export class GamePlay extends Component {
   listItem = [];
   GameSize: Vec2;
 
+  listItemMiniMap = [];
+
   nodeClick = [];
   blockClick: boolean = false;
   count: number;
   progress: number;
-  gameManager;
+  gameManager: GameManager;
 
+  listState = [30, 50, 70, 90, 100];
+  state: number = 0;
+
+  listInfor = [];
   totalTime: number = 600;
   curTime: number = 600;
 
   start() {
-    this.gameManager = find("Canvas").getComponent(GameManager);
-    this.nodePause.active = false;
+    this.totalTime = 300;
+    this.curTime = 300;
     this.lblTime.string = this.convertTime(this.curTime);
     this.timeBar.progress = this.curTime / this.totalTime;
     this.schedule(this.countDown, 1);
@@ -81,21 +83,34 @@ export class GamePlay extends Component {
 
   init(x: number, y: number) {
     this.listItem = [];
+    this.listItemMiniMap = [];
     this.nodeClick = [];
+    this.listInfor = [];
+    this.state = 0;
     this.lblScore.string = "0";
     this.container.removeAllChildren();
     this.GameSize = new Vec2(x + 4, y + 4);
     for (let i = 0; i < this.GameSize.y; i++) {
       {
         let arr = [];
+        let arr2 = [];
         for (let j = 0; j < this.GameSize.x; j++) {
           let node = instantiate(this.ItemPrefab);
           node.setPosition(
             new Vec3(
-              (-40 * this.GameSize.x) / 2 + 40 * j,
+              -100 + (-40 * this.GameSize.x) / 2 + 40 * j,
               -20 + (40 * this.GameSize.y) / 2 - 40 * i
             )
           );
+
+          node
+            .getComponent(Item)
+            .setPos(
+              new Vec2(
+                -100 + (-40 * this.GameSize.x) / 2 + 40 * j,
+                -20 + (40 * this.GameSize.y) / 2 - 40 * i
+              )
+            );
           if (
             // check các ô bao ở ngoài
             i == 0 ||
@@ -109,10 +124,15 @@ export class GamePlay extends Component {
           )
             node.active = false;
           else node.active = true;
+
+          let node2 = instantiate(node);
           this.container.addChild(node);
+          this.miniMap.addChild(node2);
           arr.push(node);
+          arr2.push(node2);
         }
         this.listItem.push(arr);
+        this.listItemMiniMap.push(arr2);
       }
     }
 
@@ -122,7 +142,7 @@ export class GamePlay extends Component {
       i < ((this.GameSize.x - 4) * (this.GameSize.y - 4)) / 2;
       i++
     )
-      listIndex.push(Math.floor(Math.random() * 22) + 1);
+      listIndex.push(Math.floor(Math.random() * 28) + 1);
 
     listIndex = listIndex.concat(listIndex);
     this.count = 0;
@@ -130,21 +150,40 @@ export class GamePlay extends Component {
       for (let j = 0; j < this.GameSize.x; j++) {
         if (this.listItem[i][j].active == true) {
           let indexRan = Math.floor(Math.random() * listIndex.length);
+
           this.listItem[i][j]
             .getComponent(Item)
             .init(new Vec2(i, j), listIndex[indexRan]);
+
+          this.listItemMiniMap[i][j]
+            .getComponent(Item)
+            .init(new Vec2(i, j), listIndex[indexRan]);
+
           listIndex.splice(indexRan, 1);
+          this.listItemMiniMap[i][j].getComponent(Item).block = true;
         }
       }
     }
+
+    for (let i = 0; i < this.GameSize.y; i++) {
+      {
+        let arr = [];
+        for (let j = 0; j < this.GameSize.x; j++) {
+          let it = this.listItem[i][j].getComponent(Item);
+          let dt = {
+            id: it.id,
+            index: it.index,
+            pos: it.pos,
+            active: it.node.active,
+          };
+          arr.push(dt);
+        }
+        this.listInfor.push(arr);
+      }
+    }
+
     this.lblCountLive.string = UserData.lives + "";
     this.lblCountHint.string = UserData.hint + "";
-    this.lblCountRefresh.string = UserData.refresh + "";
-    if (UserData.solo == false) {
-      this.lblLevel.node.active = true;
-      this.lblLevel.string = "LEVEL " + UserData.level;
-    } else this.lblLevel.node.active = false;
-    this.curTime = this.totalTime;
   }
 
   findRoad(pos1: Vec2, pos2: Vec2) {
@@ -173,7 +212,7 @@ export class GamePlay extends Component {
       ) {
         connect = true;
         this.drawLine(point1, point3, point4, point2);
-        // console.log(point1, point2, point3, point4);
+        console.log(point1, point2, point3, point4);
         return connect;
       }
     }
@@ -187,7 +226,7 @@ export class GamePlay extends Component {
       ) {
         connect = true;
         this.drawLine(point1, point3, point4, point2);
-        // console.log(point1, point2, point3, point4);
+        console.log(point1, point2, point3, point4);
         return connect;
       }
     }
@@ -203,7 +242,7 @@ export class GamePlay extends Component {
     let point4 = new Vec2(-1, -1);
     point3.y = point1.y;
     point4.y = point2.y;
-    // console.log(point1, point2, point3, point4);
+    console.log(point1, point2, point3, point4);
 
     for (let i = Math.min(point1.x, point2.x); i < this.GameSize.y; i++) {
       point3.x = i;
@@ -215,7 +254,7 @@ export class GamePlay extends Component {
       ) {
         connect = true;
         this.drawLine(point1, point3, point4, point2);
-        // console.log(point1, point2, point3, point4);
+        console.log(point1, point2, point3, point4);
         return connect;
       }
     }
@@ -230,9 +269,11 @@ export class GamePlay extends Component {
       ) {
         connect = true;
         this.drawLine(point1, point3, point4, point2);
+        console.log(point1, point2, point3, point4);
         return connect;
       }
     }
+    console.log(point1, point2, point3, point4);
 
     return connect;
   }
@@ -310,8 +351,6 @@ export class GamePlay extends Component {
               this.nodeClick[1].getComponent(Item).pos
             )
           ) {
-            console.log("jfbsjdafbjsadbkjf");
-
             setTimeout(() => {
               this.blockClick = false;
               this.nodeGraphics.clear();
@@ -319,8 +358,26 @@ export class GamePlay extends Component {
               this.lblScore.string = parseInt(this.lblScore.string) + 200 + "";
               this.progress = Math.floor(
                 (this.count / ((this.GameSize.x - 4) * (this.GameSize.y - 4))) *
-                100
+                  100
               );
+
+              if (
+                this.progress >= this.listState[this.state] &&
+                UserData.solo == true
+              ) {
+                this.state++;
+                this.sendNoticToOtherPlayer();
+              }
+
+              this.listInfor[this.nodeClick[0].getComponent(Item).pos.x][
+                this.nodeClick[0].getComponent(Item).pos.y
+              ].active = false;
+
+              this.listInfor[this.nodeClick[1].getComponent(Item).pos.x][
+                this.nodeClick[1].getComponent(Item).pos.y
+              ].active = false;
+
+              this.sendMap();
 
               this.nodeClick[0].active = false;
               this.nodeClick[1].active = false;
@@ -332,7 +389,22 @@ export class GamePlay extends Component {
                     i.destroy();
                   });
                 });
+
+                this.listItemMiniMap.forEach((e) => {
+                  e.forEach((i) => {
+                    i.destroy();
+                  });
+                });
               }
+            }, 300);
+          } else {
+            setTimeout(() => {
+              this.nodeClick[0].children[0].getComponent(Sprite).color =
+                new Color(255, 255, 255);
+              this.nodeClick[1].children[0].getComponent(Sprite).color =
+                new Color(255, 255, 255);
+              this.nodeClick = [];
+              this.blockClick = false;
             }, 300);
           }
         } else {
@@ -351,6 +423,24 @@ export class GamePlay extends Component {
 
   showWinGame() {
     this.gameManager.showNotice(config.notice.win);
+  }
+
+  sendNoticToOtherPlayer() {
+    // thông báo tiến trình user đã chơi được
+    let data = {
+      id: UserData.id,
+      username: UserData.username,
+      type: config.typeMess.Notic,
+      room: UserData.room,
+      progress: this.progress,
+      content:
+        UserData.username +
+        ": đã hoàn thành " +
+        this.listState[this.state - 1] +
+        "%",
+    };
+
+    this.gameManager.webSocket.send(JSON.stringify(data)); // gửi thông tin người chơi đến serverr
   }
 
   drawLine(p1: Vec2, p3: Vec2, p4: Vec2, p2: Vec2) {
@@ -394,42 +484,37 @@ export class GamePlay extends Component {
     }
   }
 
-  btnRefresh() {
-    if (UserData.refresh == 0) {
-      this.gameManager.showNotice(config.notice.noRefresh);
-      return;
-    }
-    let listIndex = [];
-    let size = (this.GameSize.x - 4) * (this.GameSize.y - 4);
-    for (let i = 0; i < size - this.count / 2; i++) {
-      listIndex.push(Math.floor(Math.random() * 22) + 1);
-    }
-
-    listIndex = listIndex.concat(listIndex);
-
-    for (let i = 0; i < this.GameSize.y; i++) {
-      for (let j = 0; j < this.GameSize.x; j++) {
-        if (this.listItem[i][j].active == true) {
-          let indexRan = Math.floor(Math.random() * listIndex.length);
-          this.listItem[i][j].getComponent(Item).refresh(listIndex[indexRan]);
-          listIndex.splice(indexRan, 1);
-        }
+  UpdateMiniMap(data) {
+    data = data.info;
+    for (let j = 0; j < this.GameSize.y; j++) {
+      for (let i = 0; i < this.GameSize.x; i++) {
+        let dt = data[j][i];
+        let z = this.listItemMiniMap[j][i];
+        z.getComponent(Item).refresh(dt.index, dt.pos, dt.active);
       }
     }
-
-    UserData.refresh -= 1;
-    this.lblCountRefresh.string = UserData.refresh + "";
-    this.gameManager.showNotice(config.notice.doneRefresh);
   }
 
-  btnPause() {
-    this.nodePause.active = !this.nodePause.active;
-    this.container.active = !this.container.active;
+  sendMap() {
+    let dt = {
+      type: config.typeMess.InfoMap,
+      info: this.listInfor,
+    };
+
+    this.gameManager.webSocket.send(JSON.stringify(dt));
   }
 
   countDown() {
-    if (this.curTime === 0) {
+    if (this.curTime === 0) {     // send mess hết giờ
       this.unschedule(this.countDown);
+      let dt = {
+        id: UserData.id,
+        name: UserData.username,
+        score: parseInt(this.lblScore.string),
+      };
+
+
+
     } else {
       if (this.container.active) {
         this.curTime -= 1;
@@ -448,5 +533,9 @@ export class GamePlay extends Component {
     return s;
   }
 
-  update(deltaTime: number) { }
+  update(deltaTime: number) {}
+
+  protected onEnable(): void {
+    this.gameManager = find("Canvas").getComponent(GameManager);
+  }
 }
