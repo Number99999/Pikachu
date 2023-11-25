@@ -1,4 +1,4 @@
-import { _decorator, Component, EditBox, find, Node } from "cc";
+import { _decorator, Button, Component, EditBox, find, Node } from "cc";
 import UserData from "../data/UserData";
 import { GameManager } from "./GameManager";
 import config from "../data/config";
@@ -6,18 +6,14 @@ const { ccclass, property } = _decorator;
 
 @ccclass("SignIn")
 export class SignIn extends Component {
-  @property(Node)
-  nodeBack: Node;
   @property(EditBox)
   editUser;
   @property(EditBox)
   editPass;
 
+
   gameManager: GameManager;
   start() {
-    if (UserData.firtlogin) this.nodeBack.active = false;
-    else this.nodeBack.active = true;
-
     this.gameManager = find("Canvas").getComponent(GameManager);
   }
 
@@ -36,5 +32,5 @@ export class SignIn extends Component {
     }
   }
 
-  update(deltaTime: number) {}
+  update(deltaTime: number) { }
 }

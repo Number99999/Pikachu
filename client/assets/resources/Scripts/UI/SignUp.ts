@@ -1,4 +1,4 @@
-import { _decorator, Component, EditBox, find, Node } from "cc";
+import { _decorator, Component, EditBox, find, Game, Node } from "cc";
 import { GameManager } from "../Manager/GameManager";
 import config from "../data/config";
 const { ccclass, property } = _decorator;
@@ -12,7 +12,7 @@ export class SignUp extends Component {
   @property(EditBox)
   editComfirmPass;
 
-  gameManager;
+  gameManager: GameManager;
   start() {
     this.gameManager = find("Canvas").getComponent(GameManager);
   }
@@ -40,5 +40,5 @@ export class SignUp extends Component {
     this.node.active = false;
   }
 
-  update(deltaTime: number) {}
+  update(deltaTime: number) { }
 }

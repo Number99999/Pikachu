@@ -1,29 +1,61 @@
-const mysql = require("mysql2");
+const mysql = require("mysql8");
 
 class DataBaseIO {
   connection = null;
   constructor() {
     this.connection = mysql.createConnection({
-      host: "localhost",
       user: "root",
       password: "password",
       database: "connect_animal",
     });
+    console.log(this.connection == null);
   }
 
-  createTable = function () {
-    let query =
-      "CREATE TABLE IF NOT EXISTS users(id int primary key AUTO_INCREMENT, username VARCHAR(255) NOT NULL,password VARCHAR(255) NOT NULL)";
+  createTable() {
+    this.createTableUser();
+    this.createTableLevel();
+  };
+
+  async createTableLevel() {
+    let query = "create table if not exists level(id int auto_increment primary key,score int)";
     try {
-      this.connection.query(query, (err, res) => {
-        if (err) {
-          console.error("Lỗi khi tạo bảng: ", err);
-        } else console.log("Bảng đã được tạo thành công!");
+      await new Promise((resolve, reject) => {
+        this.connection.query(query, (err, res) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(res);
+          }
+        });
       });
-    } catch (error) {
+      console.log("Bảng level đã được tạo thành công!");
+    } catch (err) {
       console.error("Lỗi khi tạo bảng: ", err);
     }
-  };
+  }
+
+  async createTableUser() {
+    let query = "CREATE TABLE IF NOT EXISTS users(id INT AUTO_INCREMENT PRIMARY KEY, " +
+      "username VARCHAR(255) NOT NULL, " +
+      "password VARCHAR(255) NOT NULL, " +
+      "level INT DEFAULT 1, " +
+      "hint INT DEFAULT 5, " +
+      "refresh INT DEFAULT 5)";
+    try {
+      await new Promise((resolve, reject) => {
+        this.connection.query(query, (err, res) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(res);
+          }
+        });
+      });
+      console.log("Bảng user đã được tạo thành công!");
+    } catch (err) {
+      console.error("Lỗi khi tạo bảng: ", err);
+    }
+  }
 
   addUser = function (data) {
     let query = "insert into users set?";
@@ -40,6 +72,22 @@ class DataBaseIO {
     });
   }
 
+  addLevel = function (data) {
+    let query = "insert into level(id, score) values(" + data.id + ", " + data.score + ");";
+    return new Promise((resolve, reject) => {
+      this.connection.query(query, (err, res) => {
+        if (err) {
+          console.error("Thêm level failed: ", err);
+          reject(err)
+        }
+        else {
+          console.log("add level successed");
+          resolve(res)
+        }
+      })
+    })
+  }
+
   getUserLogin = function (username, password) {
     const query = 'SELECT * FROM users WHERE username = ? AND password = ?';
     return new Promise((resolve, reject) => {
@@ -50,6 +98,55 @@ class DataBaseIO {
           resolve(results[0])
         }
       });
+    })
+  }
+
+  async getInfoLevel(level) {
+    const query = 'SELECT * FROM level WHERE id = ?';
+    try {
+      return await new Promise((resolve, reject) => {
+        this.connection.query(query, [level], (error, results) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(results[0]);
+          }
+        });
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+
+  async saveInfo(id, hint, refresh, level) {
+    const query = "update users set level = " + level + ",hint =" + hint + ", refresh = " + refresh + " where id=" + id
+    return new Promise((resolve, reject) => {
+      this.connection.query(query, (error, results) => {
+        if (error) {
+          reject(error)
+          console.log("Lỗi lưu info user:", error)
+        } else {
+          resolve(results)
+          console.log("luu info user thanh cong");
+        }
+      });
+    })
+  }
+
+  async saveLevel(level, score) {
+    const query = "update level set score = " + score + " where id= " + level;
+    return await new Promise((resolve, reject) => {
+      this.connection.query(query, (error, results) => {
+        if (error) {
+          reject(error);
+          console.log("Lỗi lưu info level: ", error)
+        }
+        else {
+          resolve(results);
+          console.log("Lưu info level thành công");
+        }
+      })
     })
   }
 

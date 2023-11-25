@@ -1,4 +1,4 @@
-import { _decorator, Component, instantiate, log, Node, Prefab, resources, tween, Vec2, Vec3 } from 'cc';
+import { _decorator, Component, find, instantiate, log, Node, Prefab, resources, tween, Vec2, Vec3 } from 'cc';
 const { ccclass, property } = _decorator;
 
 @ccclass('UIManager')
@@ -12,10 +12,11 @@ export class UIManager {
     }
 
     showPrefab(pre: Prefab, node: Node) {
-        if (!this.map.has(pre)) {
+        if (!this.map.has(pre.uuid)) {
             let i = instantiate(pre);
+            i.parent = find("Canvas/RootUI/nodePrefab");
+            i.setPosition(new Vec3(0, 0))
             this.map.set(pre.uuid, i)
-            node.addChild(i);
         }
         else if (this.map.get(pre.uuid).active == false) {
             let i = this.map.get(pre.uuid);

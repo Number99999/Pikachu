@@ -1,33 +1,20 @@
 const WebSocket = require("ws");
 const os = require("os");
-// const Controller = require("./controller.js");
 const config = require("./data.js");
 const { User } = require("./User.js");
 const Room = require("./Room.js");
 const DataBaseIO = require("./DatabaseIO.js");
-const { count, info } = require("console");
-// Lấy địa chỉ IP của máy tính hiện tại
-const getLocalIpAddress = () => {
-  const interfaces = os.networkInterfaces();
-  for (let interfaceName in interfaces) {
-    const addresses = interfaces[interfaceName];
-    for (let address of addresses) {
-      if (address.family === "IPv4" && !address.internal) {
-        return address.address;
-      }
-    }
-  }
-  return "127.0.0.1";
-};
+const { stringify } = require("querystring");
 
-// const ipAddress = getLocalIpAddress();
-const ipAddress = "127.0.0.1";
+const ipAddress = "0.0.0.0";
 const port = 7203;
 const listClient = new Set();
 const listRoom = [];
 const db = new DataBaseIO();
-db.createTable();
 
+
+db.createTable()
+  ;
 const wss = new WebSocket.Server({ host: ipAddress, port: port });
 
 wss.on("listening", () => {
@@ -39,9 +26,9 @@ wss.on("listening", () => {
 });
 
 wss.on("connection", (ws) => {
+  ws.firtConnect = true;
   ws.on("message", (message) => {
     let data = convertBytesToJSON(message);
-
     switch (data.type) {
       case config.typeMess.ReConnect:
         reConnect(ws, data);
@@ -59,7 +46,7 @@ wss.on("connection", (ws) => {
         joinRoom(ws, data);
         break;
       case config.typeMess.Ready: // ng chơi sẵn sàng
-        ready(data);
+        ready(ws, data);
         break;
       case config.typeMess.SignUp:
         signUp(ws, data);
@@ -67,14 +54,28 @@ wss.on("connection", (ws) => {
       case config.typeMess.SignIn:
         signIn(ws, data);
         break;
-      case config.typeMess.InfoMap:
+      case config.typeMess.InfoMap: // nhận map ng solo
         infoMap(ws, data);
+        break;
+      case config.typeMess.TimeOut:
+        timeOut(ws, data);
+        break;
+      case config.typeMess.showHint:
+        showHint(ws, data);
+        break;
+      case config.typeMess.refreshMap:
+        refreshMap(ws, data);
+        break;
+      case config.typeMess.updateLevel:
+        updateLevel(ws, data);
+        break;
+      case config.typeMess.winSolo:
+        winSolo(ws, data);
         break;
     }
   });
 
   ws.on("close", (call) => {
-    console.log("75 server", ws.userID);
     listClient.forEach((element) => {
       // tìm và xoá user trong list user
       console.log("77 server", ws.userID == element.userID);
@@ -87,14 +88,26 @@ wss.on("connection", (ws) => {
       // nếu có trong room
       listRoom.forEach((e) => {
         // tìm room
-        console.log("87 server", e, ws.room, e.id == ws.room, e.id === ws.room);
+        console.log("87 server", e, ws.room, e.id === ws.room);
         if (e.id == ws.room) {
           for (let i = 0; i < e.listUser.length; i++) {
             if (e.listUser[i] == ws.userID) e.listUser.splice(i, 1);
           }
-          console.log("93 server", e.listUser);
+          console.log("93 server listUser in room", ws.room, e.listUser);
         }
       });
+
+      listClient.forEach(e => {
+        if (e.room == ws.room) {
+          let dt = {
+            type: config.typeMess.OutRoom,
+            id: ws.userID,
+            room: ws.room,
+          }
+          e.send(JSON.stringify(dt));
+          return;
+        }
+      })
     }
   });
 });
@@ -128,6 +141,8 @@ signUp = function (ws, data) {
   });
 };
 
+
+
 signIn = function (ws, data) {
   db.getUserLogin(data.username, data.password)
     .then((user) => {
@@ -136,23 +151,31 @@ signIn = function (ws, data) {
         type: config.typeMess.SignIn,
         username: "",
         done: true,
+        level: 0,
+        hint: 0,
+        refresh: 0,
       };
       if (user != null) {
         ws.userID = user.id;
         ws.username = user.username;
         ws.ready = false;
+        ws.hint = user.hint;
+        ws.refresh = user.refresh;
+        ws.level = user.level;
+
         dt.id = user.id;
         dt.username = user.username;
-        console.log("143 server", dt);
+        dt.level = user.level;
+        dt.hint = user.hint;
+        dt.refresh = user.refresh;
         listClient.add(ws);
         ws.send(JSON.stringify(dt));
-        console.log("146 server size list client", listClient.size);
-
         listRoom.forEach((e) => {
           e.listUser.forEach((i) => {
-            if (i == ws.userID) e.listUser.delete(i);
+            if (i == ws.userID) e.listUser.splice(i, 1);
           });
         });
+        firtConnect = false;
       } else {
         dt.done = false;
         ws.send(JSON.stringify(dt));
@@ -200,6 +223,7 @@ reConnect = function (ws, data) {
 };
 
 createRoom = function (ws, data) {
+  // if (firtConnect == true) return
   let dt = {
     id: data.id,
     type: config.typeMess.CreateRoom,
@@ -240,6 +264,8 @@ createRoom = function (ws, data) {
 };
 
 outRoom = function (ws, data) {
+  if (firtConnect == true) return
+
   // user out room
   dt = {
     id: data.id,
@@ -250,6 +276,7 @@ outRoom = function (ws, data) {
 
   let room = null;
   ws.room = 0;
+  ws.ready = false;
   listRoom.forEach((e) => {
     if (e.id == dt.room) room = e;
   });
@@ -267,6 +294,8 @@ outRoom = function (ws, data) {
 };
 
 sendNotic = function (data) {
+  if (firtConnect == true) return
+
   // send notic khi solo đến các user khác trong phòng
   dt = {
     id: data.id,
@@ -280,20 +309,52 @@ sendNotic = function (data) {
 };
 
 joinRoom = function (ws, data) {
+  if (firtConnect == true) return
+  let listUsername = []
   console.log("280", data);
+
   let dt = {
     id: data.id,
     type: config.typeMess.JoinRoom,
     room: parseInt(data.room),
     content: "",
+    listUsername: listUsername,
   };
+
   let room = null;
   for (let i = 0; i < listRoom.length; i++) {
     // tìm phòng
     if (dt.room == listRoom[i].id) {
       room = listRoom[i];
-      console.log("286 server", dt.room, listRoom[i].id);
-      break;
+      console.log("325 list user in room", dt.room, listRoom[i].listUser);
+      if (room.listUser.length == 0) {
+        dt.content = "false";
+        ws.send(JSON.stringify(dt))
+        return;
+      }
+      if (room.listUser.length == 2) {
+        dt.content = "Room full";
+        ws.send(JSON.stringify(dt))
+        return;
+      }
+      else {
+        room.listUser.push(ws.userID);    // them user vao room
+        console.log("332 list user in room", dt.room, listRoom[i].listUser);
+        ws.room = listRoom[i].id
+        dt.content = "done";
+
+        listClient.forEach(e => {
+          if (e.userID == room.listUser[0]) listUsername.push(e.username)
+        })
+
+        listClient.forEach(e => {
+          if (e.userID == room.listUser[1]) listUsername.push(e.username)
+        })
+        dt.listUsername = listUsername
+
+        sendToBoad(dt);
+        return;
+      }
     }
   }
 
@@ -301,14 +362,15 @@ joinRoom = function (ws, data) {
     dt.content = "false";
   } else {
     room.listUser.push(dt.id);
+    console.log("346 list user in room", dt.room, listRoom[i].listUser);
     dt.content = "done";
     ws.room = room.id;
   }
-  console.log("304", room);
-  sendToClient(dt);
+  sendToBoad(dt);
 };
 
-ready = function (data) {
+ready = function (ws, data) {
+  if (firtConnect == true) return
   // send request gửi stage ready
   let countReady = 0;
   let dt = {
@@ -319,11 +381,10 @@ ready = function (data) {
   };
   listClient.forEach((e) => {
     // tìm user và sửa thông tin ở server, đồng thời gửi lại để set cho user
-    console.log("311 server", e.userID, e.room);
     if (e.userID == dt.id) {
-      e.ready = data.ready;
-      console.log("314 server", dt);
-      sendToBoad(dt);
+      e.ready = !e.ready
+      sendToRoom(ws, dt);
+      console.log("351 server", e.ready, e.userID, e.room);
     }
   });
 
@@ -341,20 +402,101 @@ ready = function (data) {
       else countReady += 1;
     }
   });
-  // if (countReady == 2)
-  sendToBoad(dt);
+  if (countReady == 2) {
+    console.log("join solo game");
+    sendToRoom(ws, dt);
+  }
+
 };
 
 infoMap = function (ws, data) {
+  if (firtConnect == true) return
+
   let dt = {
     id: ws.userID,
     type: config.typeMess.InfoMap,
     room: ws.room,
     info: data.info,
+    username: data.username,
+    score: data.score,
   };
-
-  sendToBoad(dt);
+  sendToBoad(dt)
 };
+
+showHint = function (ws) {
+  if (firtConnect == true) return
+
+  let dt = {
+    type: config.typeMess.showHint,
+    content: "false",
+    hint: 0,
+  }
+  if (ws.hint >= 1) {
+    ws.hint -= 1;
+    dt.content = "done";
+    dt.hint = ws.hint
+    console.log("435", dt.hint);
+    db.saveInfo(ws.userID, ws.hint, ws.refresh, ws.level)
+    ws.send(JSON.stringify(dt));
+  }
+}
+
+refreshMap = function (ws) {
+  if (firtConnect == true) return
+  let dt = {
+    type: config.typeMess.refreshMap,
+    content: "false",
+    hint: 0,
+  }
+  if (ws.refresh >= 1) {
+    ws.refresh = ws.refresh - 1;
+    dt.content = "done";
+    dt.refresh = ws.refresh
+    db.saveInfo(ws.userID, ws.hint, ws.refresh, ws.level)
+    ws.send(JSON.stringify(dt));
+  }
+}
+
+updateLevel = function (ws, data) {
+  ws.level = data.level + 1;
+
+  db.getInfoLevel(data.level)
+    .then((lv) => {
+      db.saveInfo(ws.userID, ws.hint, ws.refresh, ws.level);
+      let dt = {
+        type: config.typeMess.updateLevel,
+        level: ws.level,
+        content: null,
+        score: 0,
+      }
+      if (lv == null) {
+        db.addLevel({ id: data.level, score: data.score });
+        dt.content = "Highest";
+        dt.score = data.score;
+        ws.send(JSON.stringify(dt))
+      }
+      else if (lv.score < data.score) {
+        db.saveLevel(data.level, data.score).then(() => {
+          dt.content = "Highest"
+          dt.score = data.score;
+          ws.send(JSON.stringify(dt))
+        });  // cập nhập lại inforLevel vừa win
+      }
+      else {
+        dt.score = lv.score
+        ws.send(JSON.stringify(dt))
+      }
+    })
+
+}
+
+winSolo = function (ws, data) {
+  sendToRoom(ws, data)
+}
+
+timeOut = function (ws, data) {
+
+}
 
 sendToBoad = function (data) {
   // gửi tới tất cả server
@@ -369,6 +511,13 @@ sendToClient = function (data) {
     if (e.userID == data.id) e.send(JSON.stringify(data));
   });
 };
+
+sendToRoom = function (ws, data) {
+  listClient.forEach(e => {
+    if (data.room == e.room)
+      e.send(JSON.stringify(data))
+  })
+}
 
 convertBytesToJSON = function (str) {
   return JSON.parse(str + "");

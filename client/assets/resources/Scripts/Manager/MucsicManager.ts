@@ -5,12 +5,12 @@ const { ccclass, property } = _decorator;
 @ccclass("MucsicManager")
 export class MucsicManager {
   private static instance: MucsicManager;
-  public static volMusic: number = null;
-  public static volSound: number = null;
+  public volMusic: number = null;
+  public volSound: number = null;
   private music: AudioClip;
   private sound: AudioClip;
-  private audioMusic: AudioSource;
-  private audioSound: AudioSource;
+  public audioMusic: AudioSource;
+  public audioSound: AudioSource;
   public static getInstance() {
     if (!this.instance) this.instance = new MucsicManager();
     return this.instance;
@@ -28,13 +28,13 @@ export class MucsicManager {
     resources.load(config.Data.PathMusic, AudioClip, (err, data) => {
       this.music = data;
       this.audioMusic.clip = data;
-      console.log("laoded music");
+      console.log("loaded music");
       this.playMusic();
     });
     resources.load(config.Data.PathSound, AudioClip, (err, data) => {
       this.sound = data;
       this.audioSound.clip = data;
-      console.log("laoded sound");
+      console.log("loaded sound");
       this.playSound();
     });
   }
@@ -44,11 +44,12 @@ export class MucsicManager {
       this.setVolumeMusic(1);
       return;
     }
-    this.audioMusic.volume = parseInt(
-      sys.localStorage.getItem(config.Name.PikachuMusic)
-    );
-    this.audioMusic.play();
-    // this.audioMusic.resume()
+    else {
+      this.audioMusic.volume = parseInt(
+        sys.localStorage.getItem(config.Name.PikachuMusic)
+      );
+      this.audioMusic.play();
+    }
   }
 
   playSound() {
@@ -56,10 +57,13 @@ export class MucsicManager {
       this.setVolumeSound(1);
       return;
     }
-    this.audioSound.volume = parseInt(
-      sys.localStorage.getItem(config.Name.PikachuSound)
-    );
-    this.audioSound.playOneShot(this.audioSound.clip, 1);
+    else {
+      this.audioSound.volume = parseInt(
+        sys.localStorage.getItem(config.Name.PikachuSound)
+      );
+      this.audioSound.playOneShot(this.audioSound.clip, 1);
+    }
+
   }
 
   setVolumeMusic(vol: number) {

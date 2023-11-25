@@ -15,6 +15,11 @@ const config = {
     SignIn: "SignIn",
     ReConnect: "ReConnect",
     InfoMap: "InfoMap",
+    TimeOut: "TimeOut",
+    showHint: "ShowHint",
+    refreshMap: "RefreshMap",
+    updateLevel: "UpdateLevel",
+    winSolo: "WinGame",
   },
   notice: {
     noRefresh: "Don't have refresh turn",

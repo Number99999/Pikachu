@@ -22,6 +22,8 @@ import config from "../data/config";
 import { MucsicManager } from "./MucsicManager";
 import { Notication } from "../UI/Notication";
 import { GameSolo } from "../UI/GameSolo";
+import { UserInfo } from "../UI/UserInfo";
+import { Room } from "../UI/Room";
 const { ccclass, property } = _decorator;
 
 @ccclass("GameManager")
@@ -30,8 +32,6 @@ export class GameManager extends Component {
   gamePlay: Node;
   @property(Node)
   gameSolo: Node;
-  @property(Node)
-  nodeLogin: Node;
   @property(Node)
   nodeNotice: Node;
   @property(Label)
@@ -51,14 +51,21 @@ export class GameManager extends Component {
   gamePlayScript: GamePlay;
   gameSoloScript: GameSolo;
   musicManager: MucsicManager;
+  connected: boolean = false
 
   webSocket: WebSocket;
   firtTouch: boolean = false;
   start() {
-    this.nodeLogin.setSiblingIndex(this.node.children[1].children.length - 1);
-    this.nodeLogin.active = true;
     this.connSocket();
+    this.preLogin()
   }
+
+  preLogin() {
+    find("Canvas/RootUI/menu").active = true;
+    find("Canvas/RootUI/nodeSignIned").active = false
+    find("Canvas/RootUI/nodeUser").active = false
+  }
+
 
   init() {
     this.gamePlayScript = find("Canvas/GamePlay").getComponent(GamePlay);
@@ -68,10 +75,9 @@ export class GameManager extends Component {
   }
 
   connSocket() {
-    // this.webSocket = new WebSocket("ws://192.168.0.22:7203"); // server máy laptop
-    // this.webSocket = new WebSocket("ws://172.19.200.213:7203");   //server máy ở duy tân
-    this.webSocket = new WebSocket("ws://127.0.0.1:7203");
+    this.webSocket = new WebSocket("ws://27.72.102.114:7203");
     this.webSocket.onopen = (event) => {
+      console.log("connected");
       if (this.webSocket.readyState == 1 && this.firtTouch == false) {
         this.lblOnline.string = "online";
         this.init();
@@ -86,10 +92,10 @@ export class GameManager extends Component {
         this.lblOnline.string = "offline";
       };
     };
+
     this.webSocket.onerror = (event) => {
-      this.showNotice("Failed to connect to server");
     };
-  }
+  };
 
   createUser() {
     this.lblUsername.string = UserData.username;
@@ -102,34 +108,30 @@ export class GameManager extends Component {
   }
 
   showNotice(str: string) {
-    this.nodeNotice.getComponent(Notication).show(str);
+    this.nodeNotice?.getComponent(Notication).show(str);
   }
 
   btnShowGamePlay() {
-    this.gamePlay.active = true;
-    this.gamePlayScript.init(14, 10);
-  }
+    if (UserData.room == 0) {
+      this.gamePlay.active = true;
+      this.gamePlayScript.init(14, 8);
 
-  playMusic(vol: number) {
-    this.musicManager.setVolumeMusic(vol);
-  }
-
-  playSound(vol: number) {
-    this.musicManager.setVolumeSound(vol);
+    }
+    else this.showNotice("You can't play because of you are in the room!!!")
   }
 
   handleMess(str) {
     // nhận về id, tên request, kết quả
     let data = JSON.parse(str); // chuyển sang dạng json
+
     switch (data.type) {
       case config.typeMess.CreateRoom: // nhạn yêu cầu tạo phòng từ server
         if (data.id == UserData.id) {
           UserData.room = data.room;
-          this.lblRoom.string = "Room: " + UserData.room;
-          this.lblRoom.node.active = true;
+          let n = this.node.getChildByPath("RootUI/nodePrefab/Room");
+          n.getComponent(Room).setInforEnemy("");
         }
         break;
-
       case config.typeMess.OutRoom: // trường hợp người chơi out room
         if (data.id == UserData.id && data.content == "done") {
           UserData.room = 0;
@@ -139,23 +141,55 @@ export class GameManager extends Component {
         } else if (data.room == UserData.room && data.content == "fail") {
           this.showNotice("Out room failed!!!");
         }
+        else if (data.room == UserData.room && data.id != UserData.id) {  // event đối thủ out room
+          let n = this.node.getChildByPath("RootUI/nodePrefab/Room");
+          n.getComponent(Room).setInforEnemy("");
+          if (this.gameSolo.active) {
+            this.gameSolo.active = false;
+            this.showNotice("You win~~~");
+          }
+        }
         break;
 
       case config.typeMess.Notic: // hiển thị % người chơi đã ăn được khi đấu solo hoặc hơn
         if (data.id != UserData.id && data.room == UserData.room) {
           if (data.progress < 100) this.showNotice(data.content);
-          else this.showNotice("You lose~~~");
+          else {
+            this.showNotice("You lose~~~");
+            // this.gameSolo.active = false;
+            // this.btnOutRoom()
+            this.gameSoloScript.showResultGame(false)
+          }
         }
         break;
 
       case config.typeMess.JoinRoom: // user join room
+        console.log(data);
         if (data.id == UserData.id) {
           if (data.content == "done") {
             UserData.room = data.room;
             this.showNotice("Joined Room!!!");
             this.updateRoom();
+            if (data.name != "") {
+              let n = this.node.getChildByPath("RootUI/nodePrefab/Room");
+              n.getComponent(Room).setInforEnemy(data.name);
+            }
           } else if (data.content == "false")
-            this.showNotice("Done have room!!!");
+            this.showNotice("Don't have room!!!");
+          else if (data.content == "Room full")
+            this.showNotice("Room fully!!!")
+        }
+        if (data.room == UserData.room && data.listUsername.length == 2) {
+          let idx = data.listUsername.indexOf(UserData.username);
+          let n = this.node.getChildByPath("RootUI/nodePrefab/Room");
+          if (idx == 0) {
+            this.showNotice(data.listUsername[1] + " joined room!!!")
+            n.getComponent(Room).setInforEnemy(data.listUsername[1])
+          }
+          else {
+            this.showNotice("Joined Room!!!");
+            n.getComponent(Room).setInforEnemy(data.listUsername[0])
+          }
         }
         break;
 
@@ -166,10 +200,7 @@ export class GameManager extends Component {
 
       case config.typeMess.PlayGame:
         if (data.play == true) {
-          UserData.playing = true;
-          UserData.solo = true;
-          this.gameSolo.active = true;
-          this.gameSoloScript.init(14, 10);
+          this.actionGameSolo()
         }
         break;
 
@@ -177,9 +208,15 @@ export class GameManager extends Component {
         if (data.done == false) {
           this.showNotice("Username or password incorrect!!!");
         } else {
-          this.nodeLogin.active = false;
           UserData.username = data.username;
           UserData.id = data.id;
+          UserData.hint = data.hint;
+          UserData.refresh = data.refresh;
+          UserData.level = data.level;
+          find("Canvas/RootUI/nodePrefab/SignIn").active = false
+          find("Canvas/RootUI/menu").active = false
+          find("Canvas/RootUI/nodeSignIned").active = true
+          find("Canvas/RootUI/nodeUser").active = true
           this.init();
         }
         break;
@@ -187,7 +224,7 @@ export class GameManager extends Component {
       case config.typeMess.SignUp: // trả yêu cầu đăng kí
         if (data.stage == "done") {
           this.showNotice("Create account successfull!!!");
-          find("Canvas/menu/SignIn/SignUp").active = false;
+          // find("Canvas/RootUI/SignIn/SignUp").active = false;
         } else if (data.stage == "fail") {
           this.showNotice("Create account failed~~~");
         } else if (data.stage == "exist")
@@ -195,10 +232,51 @@ export class GameManager extends Component {
         break;
 
       case config.typeMess.InfoMap:
-        if (UserData.room == data.room && data.id != UserData.id)
-          this.gameSoloScript.UpdateMiniMap(data);
+        if (UserData.room == data.room && data.id != UserData.id) {
+          this.gameSoloScript.handleInfoUser(data);
+        }
         break;
+
+      case config.typeMess.showHint:
+        if (data.content == "done") {
+          UserData.hint = data.hint;
+          if (this.gamePlay.active == true) {
+            this.gamePlayScript.showHint();
+          } else if (this.gameSolo.active == true) {
+            this.gameSoloScript.showHint();
+          }
+        }
+        break;
+
+      case config.typeMess.refreshMap:
+        if (data.content == "done") {
+          UserData.refresh = data.refresh;
+          if (this.gamePlay.active == true) {
+            this.gamePlayScript.refresh();
+          }
+          else if (this.gameSolo.active == true) {
+            this.gameSoloScript.refresh()
+          }
+        }
+        break;
+
+      case config.typeMess.updateLevel:
+        this.updateLevel(data);
+
+        break;
+
+      case config.typeMess.winSolo:
+        this.showNotice(data.content);
+        break;
+
     }
+  }
+
+  actionGameSolo() {
+    UserData.playing = true;
+    UserData.solo = true;
+    this.gameSolo.active = true;
+    this.gameSoloScript.init(14, 8);
   }
 
   updateRoom() {
@@ -207,11 +285,19 @@ export class GameManager extends Component {
     this.lblRoom.string = "Room: " + UserData.room;
   }
 
+  updateLevel(data) {
+    // if (data.content == "Highest") {
+    //   this.gamePlayScript.showWinGame(199)
+    // }
+    this.gamePlayScript.showWinGame(data.score)
+
+  }
+
   btnCreateRoom() {
     if (UserData.room == 0) {
       let data = { id: UserData.id, type: config.typeMess.CreateRoom }; // truyền đi id và tên request
       this.webSocket.send(JSON.stringify(data));
-    } else this.showNotice("you in other room");
+    } else this.showNotice("You in other room");
   }
 
   btnOutRoom() {
@@ -225,21 +311,17 @@ export class GameManager extends Component {
     }
   }
 
-  btnJoinRoom() {
-    if (this.editBoxRoom.string.length == 0) {
-      this.showNotice("Enter the id room");
-    } else {
-      let dt = {
-        id: UserData.id,
-        type: config.typeMess.JoinRoom,
-        room: this.editBoxRoom.string,
-      };
-      this.webSocket.send(JSON.stringify(dt));
-      this.editBoxRoom.string = "";
+  btnJoinRoom(str: string) {
+    let dt = {
+      id: UserData.id,
+      name: UserData.username,
+      type: config.typeMess.JoinRoom,
+      room: str
     }
+    this.webSocket.send(JSON.stringify(dt));
   }
 
-  btnSolo() {}
+  btnSolo() { }
 
   btnReady() {
     let data = {
@@ -251,6 +333,7 @@ export class GameManager extends Component {
     if (data.room != 0) {
       this.webSocket.send(JSON.stringify(data));
     }
+    else this.showNotice("Can't ready because of you not in the room!!!")
   }
 
   btnResume() {
@@ -259,7 +342,7 @@ export class GameManager extends Component {
 
   btnReconnect() {
     if (this.webSocket.readyState == this.webSocket.CLOSED) {
-      this.webSocket = new WebSocket("ws://127.0.0.1:7203");
+      this.webSocket = new WebSocket("ws://27.72.102.114:7203");
       this.webSocket.onopen = (event) => {
         // nếu connect được server thì mới vào
         this.webSocket.send(
@@ -274,7 +357,6 @@ export class GameManager extends Component {
         );
         this.lblOnline.string = "online";
         this.showNotice("reconnect successed");
-
         if (this.webSocket.readyState == 1 && this.firtTouch == false) {
         }
 
@@ -293,8 +375,8 @@ export class GameManager extends Component {
     }
   }
 
-  btnSignUp() {
-    this.nodeLogin.active = true;
+  btnConnect() {
+
   }
 
   btnSignOut() {
@@ -304,5 +386,5 @@ export class GameManager extends Component {
     // n.position = new Vec3(0, -10  0);
   }
 
-  update(deltaTime: number) {}
+  update(deltaTime: number) { }
 }

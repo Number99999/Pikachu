@@ -406,6 +406,6 @@
 			<string>{512,1024}</string>
 			<key>textureFileName</key>
 			<string>animals.png</string>
-			</dict>
 		</dict>
+	</dict>
 </plist>

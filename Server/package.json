@@ -10,7 +10,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "lru-cache": "^7.0.0",
     "mysql2": "^3.6.2",
+    "mysql8": "^2.17.3",
     "os": "^0.1.2",
     "ws": "^8.14.2"
   }
